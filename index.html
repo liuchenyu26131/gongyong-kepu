@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>功用科普 — 产品知识库</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --sidebar: #f7f8fa;
+    --border: #e8eaed;
+    --primary: #2c3e50;
+    --accent: #e67e22;
+    --hover: #f0f0f0;
+    --text: #333;
+    --text-light: #888;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--text); height: 100vh; display: flex; background: #fff; }
+
+  .sidebar { width: 320px; min-width: 320px; background: var(--sidebar); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-header { padding: 20px 18px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-header h1 { font-size: 18px; color: var(--primary); }
+  .sidebar-header p { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+  .search-box { margin: 12px 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; background: #fff; }
+  .search-box:focus { border-color: var(--accent); }
+
+  .category { margin-bottom: 4px; }
+  .category-header { display: flex; align-items: center; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; user-select: none; gap: 4px; }
+  .category-header:hover { background: var(--hover); }
+  .category-header .arrow { font-size: 10px; transition: transform .2s; }
+  .category-header .arrow.collapsed { transform: rotate(-90deg); }
+  .category-header .count { margin-left: auto; font-size: 11px; color: var(--text-light); font-weight: 400; }
+
+  .product-list { }
+  .product-item { padding: 6px 16px 6px 32px; font-size: 13px; cursor: pointer; color: #555; display: flex; align-items: center; gap: 6px; }
+  .product-item:hover { background: var(--hover); color: var(--primary); }
+  .product-item.active { background: #e8f0fe; color: var(--accent); font-weight: 500; }
+  .product-item .tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: #eee; color: var(--text-light); }
+  .product-item.hidden { display: none; }
+
+  .content { flex: 1; overflow-y: auto; padding: 32px 40px; max-width: 900px; }
+  .content h1 { font-size: 24px; margin-bottom: 8px; }
+  .content h2 { font-size: 20px; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+  .content h3 { font-size: 16px; margin: 20px 0 8px; }
+  .content p { line-height: 1.8; margin: 12px 0; }
+  .content table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13px; display: block; overflow-x: auto; }
+  .content th, .content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  .content th { background: var(--sidebar); font-weight: 600; }
+  .content code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  .content img { max-width: 100%; }
+  .content blockquote { border-left: 4px solid var(--accent); padding: 8px 16px; margin: 12px 0; background: #fef9f4; }
+  .content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-light); text-align: center; padding: 40px; }
+  .placeholder h2 { font-size: 20px; border: none; margin-bottom: 8px; }
+  .placeholder p { font-size: 14px; line-height: 1.8; }
+
+  .share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-bottom: 16px; }
+  .share-btn:hover { opacity: .85; }
+
+  .loading { text-align: center; padding: 60px; color: var(--text-light); }
+  .error { color: #e74c3c; padding: 20px; background: #fdf0ef; border-radius: 8px; margin: 20px 0; }
+  .local-warning { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; }
+  .local-warning a { color: var(--accent); text-decoration: underline; }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column; }
+    .sidebar { width: 100%; min-width: 0; max-height: 45vh; }
+    .content { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h1>🧪 功用科普</h1>
+    <p>产品知识库 · 点击查看详情</p>
+  </div>
+  <input class="search-box" id="search" type="text" placeholder="搜索产品名称或标签..." oninput="filterProducts(this.value)">
+  <div id="category-list"></div>
+</aside>
+
+<main class="content" id="content">
+  <div class="placeholder" id="placeholder">
+    <h2>请从左侧选择一个产品</h2>
+    <p>点击产品名称即可查看其功用科普内容</p>
+  </div>
+</main>
+
+<script>
+// ===================================================================
+// 【通道1：内嵌数据】—— 本地 file:// 协议下也能显示产品列表
+// 【通道2：fetch 加载】—— GitHub Pages / HTTP 服务器下正常加载
+// ===================================================================
+
+// ========== 内嵌产品索引数据（共 76 条）==========
+var INDEX_DATA = [{"id":"002","title":"大白 — ELV全面膳食补充剂","category":"01_正分子维生素类","file":"01_正分子维生素类/002_大白-功用科普.md","tags":["复合维生素","正分子","全营养"],"url":"https://www.n.cn/share/r1/56b1b511182740e5a83cbd528894ad09?from=pc"},{"id":"003","title":"小白 — ELV氨基酸胶原蛋白肽","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/003_小白-功用科普.md","tags":["胶原蛋白","氨基酸","肽"],"url":"https://www.n.cn/share/r1/d7e50b7631e34a6dacd566878a0a69bf?from=pc"},{"id":"004","title":"小红 — ELV活性B族电解质矿物质","category":"02_矿物质与电解质","file":"02_矿物质与电解质/004_小红-功用科普.md","tags":["B族","电解质","矿物质"],"url":"https://www.n.cn/share/r1/59cfc77be70b4a05a6288b286edce5d7?from=pc"},{"id":"005","title":"小黄 — ELV活性B族ABDK维生素胶囊","category":"01_正分子维生素类","file":"01_正分子维生素类/005_小黄-功用科普.md","tags":["B族","ABDK","维生素"],"url":"https://www.n.cn/share/r1/3b71d386171b4e8590ca43eb28ee30a7?from=pc"},{"id":"006a","title":"鲍林粉A版 — 维生素营养强化剂","category":"01_正分子维生素类","file":"01_正分子维生素类/006a_鲍林粉A版-功用科普.md","tags":["维生素","正分子","鲍林"],"url":"https://www.n.cn/share/r1/d707fe6246654e858b8168b849e17574?from=pc"},{"id":"006b","title":"鲍林粉B版 — 维生素营养强化剂","category":"01_正分子维生素类","file":"01_正分子维生素类/006b_鲍林粉B版-功用科普.md","tags":["维生素","正分子","鲍林"],"url":"https://www.n.cn/share/r1/cd084db08f7b4245a3548e27f75a99be?from=pc"},{"id":"007a","title":"电解质A版 — 矿物质原料套餐","category":"02_矿物质与电解质","file":"02_矿物质与电解质/007a_电解质A版-功用科普.md","tags":["电解质","矿物质","运动"],"url":"https://www.n.cn/share/r1/b16a96f55ba14f4bbc6d03f0e94c54a8?from=pc"},{"id":"007b","title":"电解质B版 — 矿物质原料套餐","category":"02_矿物质与电解质","file":"02_矿物质与电解质/007b_电解质B版-功用科普.md","tags":["电解质","矿物质","运动"],"url":"https://www.n.cn/share/r1/c5ca4f3f02624648bbc8de8507e96701?from=pc"},{"id":"007c","title":"电解质B版新版 — 矿物质定制原料","category":"02_矿物质与电解质","file":"02_矿物质与电解质/007c_电解质B版新版-功用科普.md","tags":["电解质","矿物质","定制"],"url":""},{"id":"008a","title":"活性B族 — 定制混合原料粉","category":"01_正分子维生素类","file":"01_正分子维生素类/008a_活性B族原料粉-功用科普.md","tags":["B族","活性形式","原料粉"],"url":"https://www.n.cn/share/r1/6177c7129b4b4847ac3b64f46560f35d?from=pc"},{"id":"008b","title":"活性B族 — 代灌胶囊","category":"01_正分子维生素类","file":"01_正分子维生素类/008b_活性B族胶囊-功用科普.md","tags":["B族","活性形式","胶囊"],"url":"https://www.n.cn/share/r1/ac150186be05477c9150c723dbefeae1?from=pc"},{"id":"009","title":"VC泡腾电解质 — 复合定制营养素","category":"02_矿物质与电解质","file":"02_矿物质与电解质/009_VC泡腾电解质-功用科普.md","tags":["维生素C","泡腾","电解质"],"url":"https://www.n.cn/share/r1/c4fdaffeebd84630ac868663dfcd427c?from=pc"},{"id":"010","title":"胶原蛋白肽 — 复合定制（老款）","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/010_胶原蛋白肽-功用科普.md","tags":["胶原蛋白","肽","美容"],"url":"https://www.n.cn/share/r1/d495bb21ff5241f6a4abb2ea51104c47?from=pc"},{"id":"010b","title":"胶原蛋白肽升级版 — 复合定制","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/010b_胶原蛋白肽升级版-功用科普.md","tags":["胶原蛋白","升级","硫酸软骨素"],"url":"https://www.n.cn/share/r1/96783a3513ce4b139fef71ae72521487?from=pc"},{"id":"011","title":"抗衰粉 — 抗衰定制营养素","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/011_抗衰粉-功用科普.md","tags":["抗衰","线粒体","NAD+"],"url":"https://www.n.cn/share/r1/ec557c289b43411c933ce81b2979ef27?from=pc"},{"id":"011b","title":"抗衰胶囊 — 定制代罐胶囊","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/011b_抗衰胶囊-功用科普.md","tags":["抗衰","胶囊","人参皂苷"],"url":"https://www.n.cn/share/r1/6c2bbf86e365409cbb398f5b5137a066?from=pc"},{"id":"012","title":"氮泵 — 复合氮泵氨基酸","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/012_氮泵-功用科普.md","tags":["氮泵","运动","氨基酸"],"url":"https://www.n.cn/share/r1/170bfe1c20dd4e54b73952f19d4f6270?from=pc"},{"id":"013","title":"九合一油 — 复合定制强化营养油","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/013_九合一油-功用科普.md","tags":["油脂","MCT","中链脂肪酸"],"url":"https://www.n.cn/share/r1/3ce09e81c4854356aa2567af340aa262?from=pc"},{"id":"014a","title":"四合一油（柠檬味）","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/014a_四合一油-功用科普.md","tags":["油脂","柠檬味","中链脂肪酸"],"url":"https://www.n.cn/share/r1/f739c029934845fd8fc0fd893bbee722?from=pc"},{"id":"014b","title":"三合一油（原味）","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/014b_三合一油原味-功用科普.md","tags":["油脂","原味","中链脂肪酸"],"url":"https://www.n.cn/share/r1/6c7adff67f244dbda91e5089b6c05558?from=pc"},{"id":"014c","title":"三合一油（柠檬味无藻油）","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/014c_三合一油无藻油-功用科普.md","tags":["油脂","柠檬味","无藻油"],"url":"https://www.n.cn/share/r1/0e79993db7e44348a802176dd5bf2292?from=pc"},{"id":"015a","title":"甜梦静息A版（不含褪黑素）","category":"06_神经睡眠与情绪","file":"06_神经睡眠与情绪/015a_甜梦静息A版-功用科普.md","tags":["睡眠","褪黑素","神经"],"url":"https://www.n.cn/share/r1/6c2f071edb0b40bf932e88b669892a0e?from=pc"},{"id":"015b","title":"甜梦静息B版（含褪黑素）","category":"06_神经睡眠与情绪","file":"06_神经睡眠与情绪/015b_甜梦静息B版-功用科普.md","tags":["睡眠","褪黑素","神经"],"url":"https://www.n.cn/share/r1/6832d5d659924a838c850042ebd77073?from=pc"},{"id":"016","title":"EAA — 全谱支链氨基酸","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/016_EAA-功用科普.md","tags":["EAA","支链氨基酸","运动"],"url":"https://www.n.cn/share/r1/2f7c55adc0394b8ab722563429889184?from=pc"},{"id":"018a","title":"复合DK胶囊（60粒）","category":"01_正分子维生素类","file":"01_正分子维生素类/018a_DK胶囊60粒-功用科普.md","tags":["维生素D","维生素K2","骨骼"],"url":"https://www.n.cn/share/r1/e12ca80142164a1fb83facafcc881b51?from=pc"},{"id":"018b","title":"复合DK胶囊（120粒）","category":"01_正分子维生素类","file":"01_正分子维生素类/018b_DK胶囊120粒-功用科普.md","tags":["维生素D","维生素K2","骨骼"],"url":"https://www.n.cn/share/r1/ca72d37feafa486796cf5c8aebaade44?from=pc"},{"id":"018c","title":"DK粉 — 维生素D3/K2原料粉","category":"01_正分子维生素类","file":"01_正分子维生素类/018c_DK粉-功用科普.md","tags":["维生素D","维生素K2","原料粉"],"url":"https://www.n.cn/share/r1/43c9eefd00aa432aa31594faf3ab45ea?from=pc"},{"id":"017","title":"α-酮戊二酸(AKG)","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/017_AKG-功用科普.md","tags":["AKG","线粒体","TCA循环"],"url":"https://www.n.cn/share/r1/40238808116b408a8c5fb0bc0d5a072a?from=pc"},{"id":"019","title":"维生素A视黄醇","category":"99_单品原料","file":"99_单品原料/019_维生素A视黄醇-功用科普.md","tags":["维生素A","视黄醇","视力"],"url":"https://www.n.cn/share/r1/88fa625e72f74e5784445a4c87ee018f?from=pc"},{"id":"020","title":"维生素B2核黄素","category":"99_单品原料","file":"99_单品原料/020_维生素B2核黄素-功用科普.md","tags":["维生素B2","核黄素","能量代谢"],"url":"https://www.n.cn/share/r1/18a50b50131647f995a871c2254afb4f?from=pc"},{"id":"021","title":"牛磺酸","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/021_牛磺酸-功用科普.md","tags":["牛磺酸","氨基酸","心脏"],"url":"https://www.n.cn/share/r1/794f5723abce4a3a92b4547e745228e2?from=pc"},{"id":"022","title":"抗坏血酸钠（维生素C钠）","category":"99_单品原料","file":"99_单品原料/022_抗坏血酸钠-功用科普.md","tags":["维生素C","抗坏血酸钠","抗氧化"],"url":"https://www.n.cn/share/r1/5a609101ae8946bdb428dc7e6c24bf6d?from=pc"},{"id":"023","title":"维生素C（L-抗坏血酸）","category":"99_单品原料","file":"99_单品原料/023_维生素C-功用科普.md","tags":["维生素C","抗坏血酸","抗氧化"],"url":"https://www.n.cn/share/r1/2279d5873d114ad5b011999fa39bd89a?from=pc"},{"id":"024","title":"肌酸","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/024_肌酸-功用科普.md","tags":["肌酸","力量","ATP"],"url":"https://www.n.cn/share/r1/f4cfce8a75c14128b08d192ba1009138?from=pc"},{"id":"025","title":"L-谷氨酰胺","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/025_谷氨酰胺-功用科普.md","tags":["谷氨酰胺","肠道","免疫"],"url":"https://www.n.cn/share/r1/99587d3d67094fb29757bcb5efa56260?from=pc"},{"id":"026","title":"L-苏糖酸镁","category":"02_矿物质与电解质","file":"02_矿物质与电解质/026_苏糖酸镁-功用科普.md","tags":["镁","苏糖酸镁","大脑"],"url":"https://www.n.cn/share/r1/49c2f9e7087a4243abf879bd3334c31d?from=pc"},{"id":"027","title":"高纯度无水甜菜碱","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/027_无水甜菜碱-功用科普.md","tags":["甜菜碱","甲基化","肝脏"],"url":"https://www.n.cn/share/r1/ea6708aee6e0491cbaa4a3d6e6130989?from=pc"},{"id":"028","title":"维生素B7（生物素）","category":"99_单品原料","file":"99_单品原料/028_生物素B7-功用科普.md","tags":["生物素","维生素B7","头发"],"url":"https://www.n.cn/share/r1/aae6ade7b27a427da72ff5362c9ae181?from=pc"},{"id":"029","title":"维生素B3（烟酸）","category":"99_单品原料","file":"99_单品原料/029_烟酸B3-功用科普.md","tags":["烟酸","维生素B3","NAD+"],"url":"https://www.n.cn/share/r1/0e18b9b401ba4e139dd36db96ad148c0?from=pc"},{"id":"030","title":"维生素B2核黄素（单品）","category":"99_单品原料","file":"99_单品原料/030_核黄素B2-功用科普.md","tags":["核黄素","维生素B2"],"url":"https://www.n.cn/share/r1/81a0bfa37c864e53afaa45576dd319c6?from=pc"},{"id":"031","title":"维生素B1（苯磷硫胺）","category":"99_单品原料","file":"99_单品原料/031_苯磷硫胺B1-功用科普.md","tags":["苯磷硫胺","维生素B1","神经"],"url":"https://www.n.cn/share/r1/ce673a38a7a142b68de236dc3c6fc960?from=pc"},{"id":"032","title":"柠檬酸钾","category":"02_矿物质与电解质","file":"02_矿物质与电解质/032_柠檬酸钾-功用科普.md","tags":["钾","柠檬酸钾","电解质"],"url":"https://www.n.cn/share/r1/efa61e7d1bbc4607b14d2334ad6c01d5?from=pc"},{"id":"033","title":"左旋肉碱","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/033_左旋肉碱-功用科普.md","tags":["左旋肉碱","线粒体","脂肪代谢"],"url":"https://www.n.cn/share/r1/c46d79336f1e4830a928058f3838285b?from=pc"},{"id":"034","title":"甘氨酸镁","category":"02_矿物质与电解质","file":"02_矿物质与电解质/034_甘氨酸镁-功用科普.md","tags":["镁","甘氨酸镁","睡眠"],"url":"https://www.n.cn/share/r1/fde04f34639443ddbe5b1b66c0979c4d?from=pc"},{"id":"035","title":"甘氨酸","category":"03_氨基酸肽与肌肉营养","file":"03_氨基酸肽与肌肉营养/035_甘氨酸-功用科普.md","tags":["甘氨酸","氨基酸","睡眠"],"url":"https://www.n.cn/share/r1/f8c88ff702394712a3c1a1c829047306?from=pc"},{"id":"036","title":"盐酸甜菜碱","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/036_盐酸甜菜碱-功用科普.md","tags":["甜菜碱","胃酸","消化"],"url":"https://www.n.cn/share/r1/819a1d6e2f9448cfb81db99eac40356f?from=pc"},{"id":"037","title":"NAC — N-乙酰半胱氨酸","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/037_NAC-功用科普.md","tags":["NAC","谷胱甘肽","抗氧化"],"url":"https://www.n.cn/share/r1/a022c4971cee4daa960eca86bcbdcc93?from=pc"},{"id":"038","title":"辅酶Q10","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/038_辅酶Q10-功用科普.md","tags":["辅酶Q10","线粒体","心脏"],"url":"https://www.n.cn/share/r1/e21680e909214ed99028ba51bae5fab3?from=pc"},{"id":"039","title":"R-硫辛酸","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/039_R-硫辛酸-功用科普.md","tags":["硫辛酸","抗氧化","线粒体"],"url":"https://www.n.cn/share/r1/49841929e66140af855d29ef4983ae96?from=pc"},{"id":"042","title":"肌醇","category":"99_单品原料","file":"99_单品原料/042_肌醇-功用科普.md","tags":["肌醇","细胞信号","PCOS"],"url":"https://www.n.cn/share/r1/7c6968bc6f2645e1a73ec226c1bb9b66?from=pc"},{"id":"044","title":"硬脂酸","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/044_硬脂酸-功用科普.md","tags":["硬脂酸","脂肪酸","辅料"],"url":"https://www.n.cn/share/r1/008629b57d2b430aafc4a27a1d7d7e31?from=pc"},{"id":"045","title":"MCT油C8 — 中链甘油三酯油","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/045_MCT油C8-功用科普.md","tags":["MCT","C8","中链脂肪酸"],"url":"https://www.n.cn/share/r1/9185c4c26ecd42459a78c54d293e2ce1?from=pc"},{"id":"047a","title":"肌肽锌","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/047a_肌肽锌-功用科普.md","tags":["肌肽","锌","抗糖基化"],"url":"https://www.n.cn/share/r1/eebbb0243d8b425f81898ccbedaedaf9?from=pc"},{"id":"047b","title":"吡啶甲酸锌","category":"02_矿物质与电解质","file":"02_矿物质与电解质/047b_吡啶甲酸锌-功用科普.md","tags":["锌","吡啶甲酸锌","免疫"],"url":"https://www.n.cn/share/r1/645e5ff1d41245a9a054d7295bd70afe?from=pc"},{"id":"047c","title":"复配肌肽锌","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/047c_复配肌肽锌-功用科普.md","tags":["肌肽","锌","抗糖基化"],"url":"https://www.n.cn/share/r1/575d0e8fefd541a9b6a6b34a99a727da?from=pc"},{"id":"048","title":"白番茄浓缩粉（提取物）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/048_白番茄-功用科普.md","tags":["白番茄","番茄红素","美白"],"url":"https://www.n.cn/share/r1/e7c28db973cb4de5ad70dcb8d3caebe9?from=pc"},{"id":"049","title":"麦角硫因","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/049_麦角硫因-功用科普.md","tags":["麦角硫因","抗氧化","长寿"],"url":"https://www.n.cn/share/r1/37bd162d920d48c1ac27b263cb10a930?from=pc"},{"id":"050","title":"南非醉茄","category":"06_神经睡眠与情绪","file":"06_神经睡眠与情绪/050_南非醉茄-功用科普.md","tags":["南非醉茄","适应原","压力"],"url":"https://www.n.cn/share/r1/d1ae8d20570748b49d62ae4a6a9be119?from=pc"},{"id":"051a","title":"阿洛酮糖","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/051a_阿洛酮糖-功用科普.md","tags":["阿洛酮糖","代糖","甜味剂"],"url":"https://www.n.cn/share/r1/34189db6944a4c3788c8314c9c193640?from=pc"},{"id":"051b","title":"增强复合阿洛酮糖","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/051b_增强复合阿洛酮糖-功用科普.md","tags":["甜味剂","阿洛酮糖","代糖"],"url":"https://www.n.cn/share/r1/7b1ced6127514871bc4e48309f88e375?from=pc"},{"id":"052","title":"S-乙酰谷胱甘肽(SAG)","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/052_SAG乙酰谷胱甘肽-功用科普.md","tags":["谷胱甘肽","SAG","抗氧化"],"url":"https://www.n.cn/share/r1/a5d56065aafc431eb5e115946a208ba9?from=pc"},{"id":"053","title":"定制微量元素营养素粉剂","category":"02_矿物质与电解质","file":"02_矿物质与电解质/053_定制微量元素-功用科普.md","tags":["微量元素","碘","硒","铜"],"url":"https://www.n.cn/share/r1/032717eaa9e3433485a9c811d8088230?from=pc"},{"id":"053b","title":"定制微量元素营养素胶囊","category":"02_矿物质与电解质","file":"02_矿物质与电解质/053b_定制微量元素胶囊-功用科普.md","tags":["微量元素","胶囊","碘"],"url":"https://www.n.cn/share/r1/6ea5919d89424954990d4c8c27a11d1a?from=pc"},{"id":"054","title":"MCT粉 — 中链甘油三酯粉C8","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/054_MCT粉-功用科普.md","tags":["MCT","中链甘油三酯","能量"],"url":"https://www.n.cn/share/r1/1ef27f95fc454c21873cc90efbeeda41?from=pc"},{"id":"055","title":"L-茶氨酸","category":"06_神经睡眠与情绪","file":"06_神经睡眠与情绪/055_茶氨酸-功用科普.md","tags":["茶氨酸","放松","情绪"],"url":"https://www.n.cn/share/r1/61e27dd049a14df29c6d760ae820195d?from=pc"},{"id":"056","title":"柠檬酸钙","category":"02_矿物质与电解质","file":"02_矿物质与电解质/056_柠檬酸钙-功用科普.md","tags":["钙","柠檬酸钙","骨骼"],"url":"https://www.n.cn/share/r1/9a6bd2bb9e994620ae40e3b2b298227e?from=pc"},{"id":"057","title":"柠檬酸镁","category":"02_矿物质与电解质","file":"02_矿物质与电解质/057_柠檬酸镁-功用科普.md","tags":["镁","柠檬酸镁","电解质"],"url":"https://www.n.cn/share/r1/89dd1bdffb844cf699c279e0dd0bd5d6?from=pc"},{"id":"058","title":"三丁酸甘油酯","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/058_三丁酸甘油酯-功用科普.md","tags":["丁酸","肠道","短链脂肪酸"],"url":"https://www.n.cn/share/r1/ef2c429e3fad460ca7f506c12903a63e?from=pc"},{"id":"059","title":"葵花籽卵磷脂","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/059_葵花籽卵磷脂-功用科普.md","tags":["卵磷脂","磷脂","细胞膜"],"url":"https://www.n.cn/share/r1/fb5b677df7cb43e2bce595eb63220f10?from=pc"},{"id":"060","title":"乙酰左旋肉碱","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/060_乙酰左旋肉碱-功用科普.md","tags":["乙酰左旋肉碱","线粒体","大脑"],"url":"https://www.n.cn/share/r1/66c39c4309b142a9a6228647896ced1a?from=pc"},{"id":"061","title":"肠溶三丁酸甘油酯胶囊","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/061_肠溶三丁酸甘油酯胶囊-功用科普.md","tags":["丁酸","肠溶","肠道"],"url":"https://www.n.cn/share/r1/25b3b33d3cf54ed2a6a1aa0afe3f4732?from=pc"},{"id":"062","title":"透明质酸钠（100万单位食品级）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/062_透明质酸钠-功用科普.md","tags":["透明质酸","关节","皮肤"],"url":"https://www.n.cn/share/r1/164ffe2474464ef79e88f7a7ea289814?from=pc"},{"id":"062b","title":"复合透明质酸钠（10-60万Da）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/062b_复合透明质酸钠多分子量-功用科普.md","tags":["透明质酸","多分子量","食品级"],"url":"https://www.n.cn/share/r1/23c0460240e64f33a5105aa0eabb4256?from=pc"},{"id":"062c","title":"复合透明质酸钠（20-60万Da）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/062c_复合透明质酸钠-功用科普.md","tags":["透明质酸","中高分子量","食品级"],"url":"https://www.n.cn/share/r1/c548884f8c3a404eae22a43899595fbd?from=pc"},{"id":"063a","title":"熊去氧胆酸代灌胶囊","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/063a_熊去氧胆酸-功用科普.md","tags":["熊去氧胆酸","肝脏","胆汁"],"url":"https://www.n.cn/share/r1/145421a20301486fb9b68a0beb8aa987?from=pc"},{"id":"063b","title":"牛磺熊去氧胆酸代灌胶囊","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/063b_牛磺熊去氧胆酸-功用科普.md","tags":["牛磺熊去氧胆酸","肝脏","胆汁"],"url":"https://www.n.cn/share/r1/1b49a7b1c77a4dcf9e3ab9d056f48d0c?from=pc"},{"id":"066","title":"水溶锌代灌胶囊（漱口液）","category":"02_矿物质与电解质","file":"02_矿物质与电解质/066_水溶锌-功用科普.md","tags":["锌","水溶锌","漱口"],"url":""},{"id":"067","title":"五重镁代灌胶囊","category":"02_矿物质与电解质","file":"02_矿物质与电解质/067_五重镁-功用科普.md","tags":["镁","五重镁","多形态"],"url":""},{"id":"068","title":"基础全营养素（202603版 原料粉）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/068_基础全营养素-功用科普.md","tags":["全营养","综合","基础"],"url":""},{"id":"068b","title":"基础全营养素（202603版 胶囊版）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/068b_基础全营养素胶囊版-功用科普.md","tags":["全营养","综合","胶囊"],"url":""},{"id":"068c","title":"基础全营养素07版（双剂型 粉+胶囊）","category":"07_综合定制与功能辅料","file":"07_综合定制与功能辅料/068c_基础全营养素双剂型-功用科普.md","tags":["全营养","双剂型","粉+胶囊"],"url":""},{"id":"074","title":"Ca-AKG（双α-酮戊二酸氢钙）","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/074_CaAKG-功用科普.md","tags":["AKG","钙","线粒体"],"url":""},{"id":"075","title":"复合活性B2代灌胶囊","category":"01_正分子维生素类","file":"01_正分子维生素类/075_复合活性B2-功用科普.md","tags":["B2","活性B2","黄素"],"url":""},{"id":"076","title":"L-肌肽代灌胶囊","category":"04_抗衰与线粒体代谢","file":"04_抗衰与线粒体代谢/076_肌肽胶囊-功用科普.md","tags":["肌肽","抗糖基化","胶囊"],"url":""},{"id":"077","title":"复合岩藻多糖代灌胶囊","category":"05_油脂与肠道调理","file":"05_油脂与肠道调理/077_岩藻多糖-功用科普.md","tags":["岩藻多糖","肠胃","NAG"],"url":""},{"id":"078","title":"5-HTP色氨酸代灌胶囊","category":"06_神经睡眠与情绪","file":"06_神经睡眠与情绪/078_5HTP色氨酸-功用科普.md","tags":["5-HTP","色氨酸","血清素"],"url":"https://www.n.cn/share/r1/61e1cb0d27524914b30fc22917ac5dfc?from=pc"}];
+</script>
+
+<script>
+// ===================================================================
+// 应用逻辑
+// ===================================================================
+var indexData = INDEX_DATA;  // 内嵌数据
+// 尝试异步加载外部 index.json（GitHub Pages / HTTP 服务器下覆盖内嵌数据）
+fetch('index.json').then(function(r) { if (r.ok) return r.json(); }).then(function(data) { if (data) indexData = data; renderSidebar(); }).catch(function(){});
+
+// ========== Init ==========
+function init() {
+  renderSidebar();
+  var params = new URLSearchParams(window.location.search);
+  var pid = params.get('p');
+  if (pid) {
+    var item = indexData.find(function(d) { return d.id === pid; });
+    if (item) loadProduct(item);
+  }
+}
+
+// ========== Render Sidebar ==========
+function renderSidebar(filter) {
+  filter = filter || '';
+  var container = document.getElementById('category-list');
+  var groups = {};
+  indexData.forEach(function(item) {
+    var cat = item.category || '未分类';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  });
+
+  var catNames = {
+    '01_正分子维生素类': '正分子维生素类', '02_矿物质与电解质': '矿物质与电解质',
+    '03_氨基酸肽与肌肉营养': '氨基酸·肽·肌肉营养', '04_抗衰与线粒体代谢': '抗衰与线粒体代谢',
+    '05_油脂与肠道调理': '油脂与肠道调理', '06_神经睡眠与情绪': '神经·睡眠·情绪',
+    '07_综合定制与功能辅料': '综合定制与功能辅料', '99_单品原料': '单品原料'
+  };
+  var catOrder = ['01_正分子维生素类','02_矿物质与电解质','03_氨基酸肽与肌肉营养','04_抗衰与线粒体代谢','05_油脂与肠道调理','06_神经睡眠与情绪','07_综合定制与功能辅料','99_单品原料'];
+
+  var html = '';
+  catOrder.forEach(function(key) {
+    if (!groups[key]) return;
+    var items = groups[key].filter(function(item) {
+      if (!filter) return true;
+      var q = filter.toLowerCase();
+      return item.title.toLowerCase().indexOf(q) !== -1 ||
+             (item.tags && item.tags.some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }));
+    });
+    if (items.length === 0) return;
+    html += '<div class="category"><div class="category-header" onclick="toggleCategory(this)"><span class="arrow">▼</span> ' + (catNames[key] || key) + ' <span class="count">' + items.length + '</span></div><div class="product-list">';
+    items.forEach(function(item) {
+      html += '<div class="product-item" data-id="' + item.id + '" onclick="loadProduct(this.dataset)">' + item.title + '</div>';
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function toggleCategory(header) {
+  var list = header.nextElementSibling;
+  var arrow = header.querySelector('.arrow');
+  if (list.style.display === 'none') {
+    list.style.display = '';
+    arrow.classList.remove('collapsed');
+  } else {
+    list.style.display = 'none';
+    arrow.classList.add('collapsed');
+  }
+}
+
+function filterProducts(val) {
+  var items = document.querySelectorAll('.product-item');
+  var categories = document.querySelectorAll('.category');
+  var q = val.toLowerCase();
+  items.forEach(function(item) {
+    var data = indexData.find(function(d) { return d.id === item.dataset.id; });
+    if (!data) return;
+    var match = data.title.toLowerCase().indexOf(q) !== -1 ||
+                (data.tags && data.tags.some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }));
+    item.classList.toggle('hidden', !match && q !== '');
+  });
+  categories.forEach(function(cat) {
+    var visible = cat.querySelectorAll('.product-item:not(.hidden)').length > 0;
+    cat.style.display = (!visible && q !== '') ? 'none' : '';
+  });
+}
+
+// ========== Load Product ==========
+function loadProduct(dataset) {
+  var id = typeof dataset === 'string' ? dataset : dataset.dataset.id;
+  var data = indexData.find(function(d) { return d.id === id; });
+  if (!data) return;
+
+  document.querySelectorAll('.product-item.active').forEach(function(el) { el.classList.remove('active'); });
+  var el = document.querySelector('.product-item[data-id="' + id + '"]');
+  if (el) el.classList.add('active');
+
+  var url = new URL(window.location);
+  url.searchParams.set('p', id);
+  window.history.replaceState({}, '', url);
+
+  var content = document.getElementById('content');
+  content.innerHTML = '<div class="loading">加载中...</div>';
+
+  var filePath = data.file;
+  var sourceUrl = data.url || '';
+
+  // 检测是否为 file:// 协议
+  var isLocalFile = window.location.protocol === 'file:';
+
+  fetch(filePath).then(function(resp) {
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.text();
+  }).then(function(md) {
+    var html = marked.parse(md);
+    var localWarning = isLocalFile ? '<div class="local-warning">⚠️ 你正在通过本地文件直接打开（file://），部分功能受限。推送到 GitHub 后所有功能正常。<br>💡 也可以用 <code>start.bat</code> 启动本地服务器后访问 <code>http://localhost:8080</code></div>' : '';
+    var shareHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">';
+    shareHtml += '<button class="share-btn" onclick="copyShareUrl()">📋 复制分享链接</button>';
+    if (sourceUrl) shareHtml += '<a href="' + sourceUrl + '" target="_blank" class="share-btn" style="background:#555;text-decoration:none;">🔗 查看原文</a>';
+    shareHtml += '</div>';
+    content.innerHTML = localWarning + shareHtml + html;
+  }).catch(function(err) {
+    content.innerHTML = '<div class="error"><strong>加载失败</strong><br>' + err.message + '<br><br><small>文件路径: ' + filePath + '</small></div>';
+  });
+}
+
+function copyShareUrl() {
+  navigator.clipboard.writeText(window.location.href).then(function() {
+    var btn = document.querySelector('.share-btn');
+    var orig = btn.textContent;
+    btn.textContent = '✅ 已复制';
+    setTimeout(function() { btn.textContent = orig; }, 2000);
+  });
+}
+
+// ========== Start ==========
+init();
+</script>
+</body>
+</html>
